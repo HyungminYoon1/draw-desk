@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <meta
+      name="description"
+      content="레이어와 펜압 브러시, 정밀 편집과 고해상도 PNG·SVG 내보내기를 지원하는 그림 공방."
+    />
+    <title>DRAW DESK · 그림 공방</title>
+    <link rel="icon" href="assets/icon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="src/app.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#work">작업 영역으로</a>
+    <header>
+      <a class="brand" href="./"
+        ><span class="mark">Dd</span
+        ><span>DRAW DESK<small>그림 공방</small></span></a
+      ><input
+        id="title"
+        aria-label="문서 제목"
+        value="새 그림"
+        maxlength="160"
+      />
+      <div class="file-actions">
+        <button id="new-file">새 문서</button
+        ><label class="file-open"
+          >불러오기<input
+            id="open-file"
+            type="file"
+            accept=".json,application/json" /></label
+        ><button id="save-file">작업 파일 저장</button
+        ><button id="open-export" class="primary">내보내기 ↗</button>
+      </div>
+      <a class="gallery" href="https://hyungminyoon1.github.io/web-lab/"
+        >WEB LAB ↗</a
+      >
+    </header>
+    <div class="contextbar">
+      <div class="history-actions">
+        <button id="undo" title="실행 취소 (Ctrl+Z)" aria-label="실행 취소">
+          ↶</button
+        ><button
+          id="redo"
+          title="다시 실행 (Ctrl+Shift+Z)"
+          aria-label="다시 실행"
+        >
+          ↷</button
+        ><span id="save-state" role="status"></span>
+      </div>
+      <div class="view-actions">
+        <button id="zoom-out" aria-label="축소">−</button
+        ><label
+          ><input
+            id="zoom"
+            type="number"
+            min="5"
+            max="1600"
+            step="1"
+            value="100"
+            aria-label="확대 비율"
+          />%</label
+        ><button id="zoom-in" aria-label="확대">＋</button
+        ><button id="fit">화면에 맞춤</button
+        ><button id="open-canvas">캔버스 설정</button>
+      </div>
+    </div>
+    <main id="work" class="workshop">
+      <aside class="tools" aria-label="그리기 도구">
+        <button data-tool="select" title="선택 (V)"><span>↖</span>선택</button
+        ><button data-tool="ink" aria-pressed="true" title="브러시 (B)">
+          <span>╱</span>브러시</button
+        ><button data-tool="pencil" title="연필 (P)"><span>✎</span>연필</button
+        ><button data-tool="marker" title="마커 (M)"><span>▰</span>마커</button
+        ><button data-tool="eraser" title="지우개 (E)">
+          <span>▱</span>지우개</button
+        ><button data-tool="line" title="직선 (L)"><span>╲</span>직선</button
+        ><button data-tool="rect" title="사각형 (R)">
+          <span>□</span>사각형</button
+        ><button data-tool="ellipse" title="타원 (O)"><span>○</span>타원</button
+        ><button data-tool="text" title="글자 (T)"><span>T</span>글자</button
+        ><button data-tool="hand" title="이동 (H / Space)">
+          <span>✥</span>이동</button
+        ><button id="pattern-toggle" title="패턴 생성">
+          <span>❋</span>패턴
+        </button>
+      </aside>
+      <section class="stage-area" aria-label="그림 작업">
+        <div id="stage" class="stage">
+          <canvas
+            id="canvas"
+            tabindex="0"
+            aria-label="그림 캔버스. 도구를 선택하고 그리세요. Space를 누른 채 이동하고 Ctrl 또는 Cmd와 휠로 확대할 수 있습니다."
+          ></canvas>
+          <div id="tool-hint" class="tool-hint"></div>
+        </div>
+        <div class="stage-footer">
+          <span id="document-size"></span><span id="coordinates">X — · Y —</span
+          ><span id="object-count"></span>
+        </div>
+      </section>
+      <aside class="properties" aria-label="속성과 레이어">
+        <section class="property-section">
+          <h2>도구 속성 <span id="tool-name">브러시</span></h2>
+          <div class="two-fields">
+            <label>색<input id="color" type="color" value="#254d54" /></label
+            ><label
+              >굵기 · px<input
+                id="size"
+                type="number"
+                min=".1"
+                max="512"
+                step=".1"
+                value="12"
+            /></label>
+          </div>
+          <div id="swatches" class="swatches"></div>
+          <label
+            >불투명도
+            <span
+              ><input
+                id="opacity"
+                type="range"
+                min=".01"
+                max="1"
+                step=".01"
+                value="1"
+              /><output id="opacity-value">100%</output></span
+            ></label
+          ><label
+            >흔들림 보정
+            <span
+              ><input
+                id="smoothing"
+                type="range"
+                min="0"
+                max=".9"
+                step=".01"
+                value=".25"
+              /><output id="smoothing-value">25%</output></span
+            ></label
+          ><label class="check"
+            ><input id="pressure" type="checkbox" checked />펜압으로 굵기
+            조절</label
+          ><label class="check"
+            ><input id="fill-shapes" type="checkbox" />도형 내부 채우기</label
+          >
+          <div class="two-fields">
+            <label
+              >글꼴<select id="font">
+                <option value="sans-serif">고딕</option>
+                <option value="serif">명조</option>
+                <option value="monospace">고정폭</option>
+              </select></label
+            ><label
+              >글자 크기<input
+                id="font-size"
+                type="number"
+                value="96"
+                min="1"
+                max="512"
+                step=".1"
+            /></label>
+          </div>
+        </section>
+        <section id="selection-settings" class="property-section" hidden>
+          <h2>선택 개체</h2>
+          <div class="two-fields">
+            <label>중심 X<input id="select-x" type="number" step=".1" /></label
+            ><label>중심 Y<input id="select-y" type="number" step=".1" /></label
+            ><label
+              >너비 · px<input
+                id="select-width"
+                type="number"
+                min=".1"
+                step=".1" /></label
+            ><label
+              >높이 · px<input
+                id="select-height"
+                type="number"
+                min=".1"
+                step=".1"
+            /></label>
+          </div>
+          <label
+            >회전 · °<input id="select-angle" type="number" step=".1"
+          /></label>
+          <label id="selected-text-label" hidden>글자 내용<textarea id="selected-text" maxlength="2000" rows="3"></textarea></label>
+          <div class="two-fields">
+            <button id="duplicate">복제</button
+            ><button id="delete-object" class="danger">삭제</button>
+          </div>
+        </section>
+        <section id="pattern-settings" class="property-section" hidden>
+          <h2>패턴 만들기</h2>
+          <label
+            >움직임<select id="pattern-mode">
+              <option value="attract">중심으로 끌어당김</option>
+              <option value="repel">바깥으로 밀어냄</option>
+              <option value="orbit">나선 궤적</option>
+            </select></label
+          >
+          <div class="two-fields">
+            <label
+              >입자 수<input
+                id="pattern-count"
+                type="number"
+                min="12"
+                max="160"
+                value="80"
+                step="1" /></label
+            ><label
+              >궤적 길이<input
+                id="pattern-steps"
+                type="number"
+                min="16"
+                max="160"
+                value="96"
+                step="1" /></label
+            ><label
+              >힘<input
+                id="pattern-strength"
+                type="number"
+                min=".001"
+                max="2"
+                value=".5"
+                step=".001" /></label
+            ><label
+              >색 조합<select id="pattern-palette">
+                <option value="ocean">바다</option>
+                <option value="ember">노을</option>
+                <option value="ink">먹빛</option>
+              </select></label
+            >
+          </div>
+          <label
+            >시드<input
+              id="pattern-seed"
+              type="number"
+              min="0"
+              max="4294967295"
+              step="1"
+              value="12864" /></label
+          ><button id="generate-pattern" class="primary">
+            패턴 레이어 추가</button
+          ><button id="random-pattern">새 시드</button>
+          <p class="small">
+            궤적을 편집 가능한 선으로 만듭니다. 레이어에서 투명도와 합성을
+            조절할 수 있습니다.
+          </p>
+        </section>
+        <section class="property-section layer-section">
+          <div class="section-head">
+            <h2>레이어</h2>
+            <button id="add-layer" aria-label="레이어 추가">＋</button>
+          </div>
+          <div id="layers" class="layers"></div>
+          <label>레이어 이름<input id="layer-name" maxlength="100" /></label
+          ><label
+            >레이어 불투명도
+            <span
+              ><input
+                id="layer-opacity"
+                type="range"
+                min="0"
+                max="1"
+                step=".01"
+                value="1"
+              /><output id="layer-opacity-value">100%</output></span
+            ></label
+          ><label
+            >합성<select id="blend">
+              <option value="normal">보통</option>
+              <option value="multiply">곱하기</option>
+              <option value="screen">스크린</option>
+              <option value="overlay">오버레이</option>
+            </select></label
+          >
+          <div class="layer-actions">
+            <button id="layer-up" aria-label="레이어 위로">↑</button
+            ><button id="layer-down" aria-label="레이어 아래로">↓</button
+            ><button id="layer-lock">잠금</button
+            ><button id="delete-layer" class="danger">삭제</button>
+          </div>
+        </section>
+      </aside>
+    </main>
+    <dialog id="export-dialog">
+      <div class="dialog-title">
+        <h2>내보내기</h2>
+        <button data-close="export-dialog" aria-label="내보내기 닫기">✕</button>
+      </div>
+      <p class="small">
+        원본 개체를 선택한 크기로 다시 그립니다. 작업 파일은 별도로 저장하세요.
+      </p>
+      <label
+        >PNG 긴 변 · px<select id="export-edge">
+          <option value="2400">2400 px</option>
+          <option value="4096" selected>4096 px</option>
+          <option value="6000">6000 px</option>
+          <option value="8192">8192 px</option>
+        </select></label
+      ><label class="check"
+        ><input id="transparent-export" type="checkbox" />배경을 투명하게</label
+      >
+      <p id="export-estimate" class="small"></p>
+      <div class="export-buttons">
+        <button id="export-png" class="primary">PNG 다운로드</button
+        ><button id="export-svg">SVG 다운로드</button
+        ><button id="export-json">편집 파일 JSON</button>
+      </div>
+      <p id="export-status" role="status"></p>
+    </dialog>
+    <dialog id="canvas-dialog">
+      <div class="dialog-title">
+        <h2 id="canvas-dialog-title">캔버스 설정</h2>
+        <button data-close="canvas-dialog" aria-label="캔버스 설정 닫기">
+          ✕
+        </button>
+      </div>
+      <div class="two-fields">
+        <label
+          >너비 · px<input
+            id="doc-width"
+            type="number"
+            min="256"
+            max="8192"
+            step="1"
+            value="2400" /></label
+        ><label
+          >높이 · px<input
+            id="doc-height"
+            type="number"
+            min="256"
+            max="8192"
+            step="1"
+            value="1600"
+        /></label>
+      </div>
+      <label>배경색<input id="background" type="color" value="#fffdf7" /></label
+      ><label class="check"
+        ><input id="background-transparent" type="checkbox" />투명 배경</label
+      >
+      <p class="small">
+        최대 8192px, 32메가픽셀. 기존 문서의 크기를 줄여도 영역 밖 개체는 작업
+        파일에 남습니다.
+      </p>
+      <button id="apply-canvas" class="primary">적용</button>
+      <p id="canvas-status" role="status"></p>
+    </dialog>
+    <div id="notice" role="status" aria-live="polite"></div>
+    <noscript>그림 공방을 사용하려면 JavaScript를 켜주세요.</noscript>
+  </body>
+</html>
