@@ -1,5 +1,9 @@
 # Verification — 2026-10-09
 
+## 2026-10-13 NEW systematic edge audit — LOCAL / parent integration pending
+
+[Full source inventory, existing/new executable matrix, RED_GREEN logs and limitations](edge-cases-20261013.md). Added 20 Node tests; **28/28** full suite PASS. New browser scenarios **12/12** PASS, plus the retained primary-flow/export harness. Tests passing unchanged source are coverage additions. All evidence: ignored output/playwright/edge-20261013. Decision D06. UI change: YES,320px zoom field; actual gallery capture included. No commit/push/deploy/remote CI/live run; parent publishes.
+
 ## 2026-10-13 창작 편집 점검 — LOCAL / 통합 대기
 
 - SOURCE VERIFIED: 저장소 인벤토리, architecture.md → requirements.md → README.md, docs/decisions.md와 이 검증 문서, .gitattributes/ignore/workflow, model/render/app, HTML, 기존 모델 테스트와 check/serve. api-spec.md와 AGENTS.md는 없음. SOURCE PARTIAL: 기존 CSS는 관련 레이아웃만 검토; vendor가 없는 이 앱의 폰트/라이선스·아이콘 바이너리는 인벤토리와 정적 자산 검사 범위. 다른 저장소/갤러리는 수정하지 않음.

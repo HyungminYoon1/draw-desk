@@ -1,5 +1,15 @@
 # Decisions
 
+## D06 — Evidence-first boundary and stale-input repair (2026-10-13)
+
+Context: the new post-maintenance audit executed failing assertions before product edits; see [edge audit](edge-cases-20261013.md). Async file completion could replace a later accepted file, edit/new document, or still-focused typed text.
+
+Options: block the whole editor while reading, accept whichever read finishes last, or invalidate pending reads when newer user input takes precedence. Decision: keep a page-memory generation in app.js; capture it at file selection, invalidate on subsequent input/edit/undo/redo/replacement and relevant gestures/jobs, and ignore stale completion/error before parsing or confirmation. Clear the file input immediately so older completion cannot clear a newer file. Rationale: preserve the user's newer work without freezing the editor or changing persisted data.
+
+Additional boundary decision: Keep40MB as a UTF-8 byte limit at every parser entry, including storage callers; retain the fast character-length rejection before byte allocation. Keep the320px numeric value legible with a25px wider existing control; do not change zoom range or layout structure.
+
+Affected files: dist/src/app.js, dist/src/model.js, dist/styles.css, test/edge.test.js, tools/edge-browser.mjs, docs/edge-cases-20261013.md, docs/verification.md, docs/decisions.md. No architecture/layer/schema/storage-key/resource-limit/dependency expansion. Review: the exact failing assertions pass after fixes; full suite and real1440/390/320 interactions/export harness pass. Baseline-passing tests remain coverage additions. Physical hardware, external editor interoperability and remote CI/live require separate review; parent owns publication.
+
 ## D05 — Cancel incomplete edits and preserve independent style fields (2026-10-13)
 
 Context: browser regression reproduced Escape leaving a dragged transform in memory; a later title edit persisted it. Changing outline width also replaced a separately colored fill with none. Options: repaint only, discard all editing state, or restore the gesture's original transform and update only the changed style field. Decision: restore move/resize on Escape, tool change, pinch entry and blur; retain confirmed document/history. Read the selected shape's fill toggle and change color/width/opacity/fill/font independently. Finish a pending pointer edit before explicit project saving. Rationale: cancel means the temporary edit is removed, and an outline edit must not alter unrelated appearance. No format, quality, storage-key or resource-limit change. Affected: dist/src/app.js, index/styles, tools/browser-regression.js, tools/verify-browser.mjs. Review: regression fails before the fix, then passes; real stroke/layer lock/opacity, undo/redo, JSON roundtrip, original-resolution exports, corrupt autosave and mobile guide readability. Physical multitouch/pen coverage remains separate.

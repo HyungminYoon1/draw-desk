@@ -38,6 +38,9 @@ let doc,
   storageBlocked = false,
   dirty = false,
   newMode = false;
+let importGeneration = 0;
+// A late file read must not discard even an input that has not blurred yet.
+document.addEventListener("input", () => { importGeneration++; });
 const pointers = new Map(),
   names = {
     select: "선택",
@@ -156,6 +159,7 @@ function saveLocal() {
   }
 }
 function commit() {
+  importGeneration++;
   try {
     doc = validateDocument(doc);
     history.commit(doc);
@@ -483,6 +487,7 @@ canvas.addEventListener("pointerdown", (event) => {
     return;
   }
   const p = point(event);
+  importGeneration++;
   if (space || tool === "hand" || event.button === 1) {
     gesture = {
       kind: "pan",
@@ -823,6 +828,7 @@ $("delete-layer").addEventListener("click", () => {
   });
 });
 function undo() {
+  importGeneration++;
   cancelGesture();
   const next = history.undo();
   if (next) {
@@ -835,6 +841,7 @@ function undo() {
   }
 }
 function redo() {
+  importGeneration++;
   cancelGesture();
   const next = history.redo();
   if (next) {
@@ -993,6 +1000,7 @@ function saveProject() {
 $("save-file").addEventListener("click", saveProject);
 $("export-json").addEventListener("click", saveProject);
 $("open-file").addEventListener("change", async (event) => {
+  const token = ++importGeneration;
   const file = event.target.files[0];
   event.target.value = "";
   if (!file) return;
@@ -1001,7 +1009,9 @@ $("open-file").addEventListener("change", async (event) => {
     return;
   }
   try {
-    const next = parseDocument(await file.text());
+    const raw = await file.text();
+    if (token !== importGeneration) return;
+    const next = parseDocument(raw);
     if (!next) {
       notice("지원하지 않거나 손상된 작업 파일입니다. 현재 문서는 유지됩니다.");
       return;
@@ -1023,7 +1033,7 @@ $("open-file").addEventListener("change", async (event) => {
     fit();
     notice("작업 파일을 불러왔습니다.");
   } catch {
-    notice("작업 파일을 읽지 못했습니다.");
+    if (token === importGeneration) notice("작업 파일을 읽지 못했습니다.");
   }
 });
 document

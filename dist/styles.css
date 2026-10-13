@@ -698,7 +698,7 @@ dialog p[role="status"] {
     padding: 6px 5px;
   }
   .view-actions label input {
-    width: 41px;
+    width: 66px;
   }
   .workshop {
     grid-template-columns: 47px minmax(0, 1fr);

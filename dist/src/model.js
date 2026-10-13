@@ -95,7 +95,8 @@ export function transformedBounds(item) {
   };
 }
 export function parseDocument(raw) {
-  if (typeof raw !== "string" || raw.length > LIMITS.file) return null;
+  if (typeof raw !== "string" || raw.length > LIMITS.file ||
+      new TextEncoder().encode(raw).byteLength > LIMITS.file) return null;
   try {
     const d = JSON.parse(raw);
     if (
