@@ -1,5 +1,9 @@
 # Decisions
 
+## D05 — Cancel incomplete edits and preserve independent style fields (2026-10-13)
+
+Context: browser regression reproduced Escape leaving a dragged transform in memory; a later title edit persisted it. Changing outline width also replaced a separately colored fill with none. Options: repaint only, discard all editing state, or restore the gesture's original transform and update only the changed style field. Decision: restore move/resize on Escape, tool change, pinch entry and blur; retain confirmed document/history. Read the selected shape's fill toggle and change color/width/opacity/fill/font independently. Finish a pending pointer edit before explicit project saving. Rationale: cancel means the temporary edit is removed, and an outline edit must not alter unrelated appearance. No format, quality, storage-key or resource-limit change. Affected: dist/src/app.js, index/styles, tools/browser-regression.js, tools/verify-browser.mjs. Review: regression fails before the fix, then passes; real stroke/layer lock/opacity, undo/redo, JSON roundtrip, original-resolution exports, corrupt autosave and mobile guide readability. Physical multitouch/pen coverage remains separate.
+
 ## D04 — Self-hosted licensed Korean UI typography
 
 Context: default font availability differs across desktops and browser QA, degrading Korean tool legibility. Options: remote CDN, machine-specific fonts, or vendored open fonts. Decision: unmodified Pretendard Variable v1.3.9 WOFF2 served from the same origin, with the author's complete SIL OFL retained in assets/fonts/OFL.txt; no CDN requests. Rationale: stable modern UI without tracking or licensing guesswork. Affected: font asset/license, stylesheet/CSP, binary attributes and documentation. Review: original upstream asset and license, browser font loading; exported SVG text uses stated native font families rather than bundling UI font outlines.

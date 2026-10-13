@@ -1,0 +1,51 @@
+import { createRequire } from 'node:module';
+import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const { chromium }=createRequire(resolve(process.argv[2]))('playwright');
+const root=resolve(import.meta.dirname,'..'),out=resolve(root,'output/playwright/qa-20261013');
+await mkdir(out,{recursive:true});
+const browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true,args:['--mute-audio']});
+const context=await browser.newContext({viewport:{width:1440,height:1000},acceptDownloads:true});
+const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+const checks=[],screenshots=[];
+const project=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('draw-desk-project-v1')));
+const download=async(selector,name)=>{const promise=page.waitForEvent('download');await page.locator(selector).click();const d=await promise;const path=resolve(out,name);await d.saveAs(path);return path;};
+try{
+  const regression=vm.runInNewContext(await readFile(resolve(root,'tools/browser-regression.js'),'utf8'),{console});await regression(page);checks.push('Escape drag rollback; stroke width preserves independent fill');
+  await page.evaluate(()=>localStorage.removeItem('draw-desk-project-v1'));await page.reload();
+  await page.locator('#practice summary').click();
+  await page.screenshot({path:resolve(out,'desktop.png')});screenshots.push('desktop.png');
+  await page.locator('#add-layer').click();
+  await page.locator('#layer-name').fill('구름 연습');await page.locator('#layer-name').press('Tab');
+  await page.locator('[data-tool=marker]').click();
+  const box=await page.locator('#canvas').boundingBox();
+  await page.mouse.move(box.x+box.width*.4,box.y+box.height*.4);await page.mouse.down();await page.mouse.move(box.x+box.width*.55,box.y+box.height*.35,{steps:20});await page.mouse.up();
+  const drawn=await project();assert.equal(drawn.layers.at(-1).items.length,1);assert(drawn.layers.at(-1).items[0].points.length>10);
+  await page.locator('#layer-opacity').fill('0.55');await page.locator('#layer-opacity').press('Tab');
+  await page.locator('#layer-lock').click();const locked=await project();assert(locked.layers.at(-1).locked);
+  await page.mouse.click(box.x+box.width*.4,box.y+box.height*.4);assert.deepEqual(await project(),locked);
+  await page.locator('#undo').click();assert(!(await project()).layers.at(-1).locked);
+  await page.locator('#redo').click();assert.deepEqual(await project(),locked);
+  checks.push('real 21-point marker; layer opacity/lock; blocked drawing; undo/redo');
+  const jsonPath=await download('#save-file','roundtrip.draw.json'),raw=await readFile(jsonPath,'utf8');assert.deepEqual(JSON.parse(raw),locked);
+  await page.locator('#open-file').setInputFiles(jsonPath);await page.waitForFunction(()=>document.querySelector('#notice').textContent.includes('불러왔습니다'));assert.deepEqual(await project(),locked);
+  await page.locator('#open-file').setInputFiles({name:'bad.json',mimeType:'application/json',buffer:Buffer.from('{')});assert.deepEqual(await project(),locked);
+  checks.push('actual downloaded/imported JSON preserves layers and stroke; malformed import leaves state');
+  await page.locator('#open-export').click();const pngPath=await download('#export-png','full-4096.png');const bytes=await readFile(pngPath);assert.equal(bytes.readUInt32BE(16),4096);assert.equal(bytes.readUInt32BE(20),2731);assert(bytes.length>10000);
+  const svgPath=await download('#export-svg','drawing.svg');const svg=await readFile(svgPath,'utf8');assert.equal(await page.evaluate(s=>new DOMParser().parseFromString(s,'image/svg+xml').querySelector('parsererror')===null,svg),true);
+  await page.locator('#export-edge').selectOption('8192');assert(await page.locator('#export-png').isDisabled());assert.deepEqual(await project(),locked);
+  await page.locator('[data-close=export-dialog]').click();checks.push('4096×2731 PNG and parsed SVG; over-budget export disabled without changing document');
+  for(const width of [390,320]){
+    await page.setViewportSize({width,height:900});await page.locator('#practice').scrollIntoViewIfNeeded();
+    assert.equal(await page.evaluate(()=>Math.max(0,document.documentElement.scrollWidth-innerWidth)),0);
+    const path=resolve(out,`mobile-${width}.png`);await page.screenshot({path});screenshots.push(`mobile-${width}.png`);
+  }
+  await page.locator('#add-layer').click();await page.locator('[data-tool=ink]').click();
+  await page.locator('#canvas').scrollIntoViewIfNeeded();const mobile=await page.locator('#canvas').boundingBox();
+  await page.mouse.move(mobile.x+mobile.width*.35,mobile.y+mobile.height*.45);await page.mouse.down();await page.mouse.move(mobile.x+mobile.width*.55,mobile.y+mobile.height*.48,{steps:10});await page.mouse.up();assert.equal((await project()).layers.at(-1).items.length,1);
+  await page.locator('#undo').click();assert.equal((await project()).layers.at(-1).items.length,0);checks.push('390/320 no overflow; narrow viewport actual drawing and undo');
+  const damaged=await context.newPage();await damaged.addInitScript(()=>localStorage.setItem('draw-desk-project-v1','{corrupt'));await damaged.goto('http://127.0.0.1:4291/');await damaged.locator('#add-layer').click();assert.equal(await damaged.evaluate(()=>localStorage.getItem('draw-desk-project-v1')),'{corrupt');await damaged.close();checks.push('damaged local project preserved through editing');
+  assert.deepEqual(errors,[]);const report={status:'PASS',checks,errors,screenshots,selectors:['#practice','#canvas','#layer-opacity','#layer-lock','#open-file','#export-png']};await writeFile(resolve(out,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+}finally{await browser.close();}

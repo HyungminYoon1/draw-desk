@@ -722,3 +722,14 @@ dialog p[role="status"] {
     transition: none !important;
   }
 }
+.practice-guide { font-size: 12px; line-height: 1.65; }
+.practice-guide summary { cursor: pointer; }
+.practice-guide ol { padding-left: 22px; }
+.practice-guide li { margin: 6px 0; }
+@media (max-width: 700px) {
+  .properties .practice-guide { grid-column: 1 / -1; }
+  .properties .layer-section { grid-row: 2 / span 3; }
+}
+@media (max-width: 380px) {
+  .properties .layer-section { grid-row: auto; }
+}

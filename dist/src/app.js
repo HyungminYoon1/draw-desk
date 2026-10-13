@@ -232,6 +232,8 @@ function sync() {
     $("color").value = item.color;
     $("size").value = item.size;
     $("opacity").value = item.opacity;
+    if (item.type === "rect" || item.type === "ellipse")
+      $("fill-shapes").checked = item.fill !== "none";
     $("selected-text-label").hidden = item.type !== "text";
     if(item.type === "text") { $("selected-text").value=item.text; $("font").value=item.font; $("font-size").value=item.fontSize; }
     for(const id of ["select-x","select-y","select-width","select-height","select-angle","selected-text","duplicate","delete-object"])$(id).disabled=owner(item).locked;
@@ -325,6 +327,7 @@ canvas.addEventListener(
   { passive: false },
 );
 function setTool(next) {
+  cancelGesture();
   tool = next;
   if (next !== "select") selectedId = null;
   for (const button of document.querySelectorAll("[data-tool]"))
@@ -368,20 +371,22 @@ for (const color of [
   button.setAttribute("aria-label", `색 ${color}`);
   button.addEventListener("click", () => {
     $("color").value = color;
-    applyStyle(true);
+    applyStyle(true, "color");
   });
   $("swatches").append(button);
 }
-function applyStyle(save = false) {
+function applyStyle(save = false, field) {
   const i = selected();
   $("opacity-value").value = Math.round(Number($("opacity").value) * 100) + "%";
   if (i && tool === "select" && !owner(i).locked) {
-    i.color = $("color").value;
-    i.size = Math.max(0.1, Math.min(512, Number($("size").value) || 0.1));
-    i.opacity = Number($("opacity").value);
-    if (i.type !== "stroke" && i.type !== "text")
+    if (field === "color") i.color = $("color").value;
+    if (field === "size")
+      i.size = Math.max(0.1, Math.min(512, Number($("size").value) || 0.1));
+    if (field === "opacity") i.opacity = Number($("opacity").value);
+    if ((field === "fill-shapes" || (field === "color" && i.fill !== "none")) &&
+        (i.type === "rect" || i.type === "ellipse"))
       i.fill = $("fill-shapes").checked ? $("color").value : "none";
-    if (i.type === "text") {
+    if (i.type === "text" && (field === "font" || field === "font-size")) {
       i.font = $("font").value;
       i.fontSize = Math.max(
         1,
@@ -403,8 +408,8 @@ for (const id of [
   "font",
   "font-size",
 ]) {
-  $(id).addEventListener("input", () => applyStyle());
-  $(id).addEventListener("change", () => applyStyle(true));
+  $(id).addEventListener("input", () => applyStyle(false, id));
+  $(id).addEventListener("change", () => applyStyle(true, id));
 }
 $("smoothing").addEventListener(
   "input",
@@ -467,8 +472,7 @@ canvas.addEventListener("pointerdown", (event) => {
   canvas.setPointerCapture(event.pointerId);
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   if (pointers.size === 2) {
-    pending = null;
-    gesture = null;
+    cancelGesture();
     const p = [...pointers.values()];
     gesture = {
       kind: "pinch",
@@ -664,6 +668,12 @@ canvas.addEventListener("pointermove", (event) => {
   }
   schedule();
 });
+function cancelGesture() {
+  if (gesture?.item) gesture.item.transform = { ...gesture.transform };
+  gesture = null;
+  pending = null;
+  schedule();
+}
 function finishPointer(event, cancel = false) {
   pointers.delete(event.pointerId);
   if (!gesture || gesture.kind === "pinch") {
@@ -813,8 +823,7 @@ $("delete-layer").addEventListener("click", () => {
   });
 });
 function undo() {
-  pending = null;
-  gesture = null;
+  cancelGesture();
   const next = history.undo();
   if (next) {
     doc = next;
@@ -826,6 +835,7 @@ function undo() {
   }
 }
 function redo() {
+  cancelGesture();
   const next = history.redo();
   if (next) {
     doc = next;
@@ -844,6 +854,7 @@ $("title").addEventListener("change", () =>
 document.addEventListener("keydown", (event) => {
   if (
     /INPUT|SELECT|TEXTAREA/.test(event.target.tagName) ||
+    event.isComposing || event.altKey ||
     $("export-dialog").open ||
     $("canvas-dialog").open
   )
@@ -859,6 +870,7 @@ document.addEventListener("keydown", (event) => {
     return;
   }
   if (event.key === " ") {
+    if (event.target.closest("button,a")) return;
     event.preventDefault();
     space = true;
     canvas.style.cursor = "grab";
@@ -884,8 +896,7 @@ document.addEventListener("keydown", (event) => {
   if (!event.ctrlKey && !event.metaKey && map[event.key.toLowerCase()])
     setTool(map[event.key.toLowerCase()]);
   if (event.key === "Escape") {
-    pending = null;
-    gesture = null;
+    cancelGesture();
     selectedId = null;
     sync();
     schedule();
@@ -920,11 +931,7 @@ document.addEventListener("keyup", (e) => {
 });
 window.addEventListener("blur", () => {
   space = false;
-  if (gesture?.item) {
-    gesture.item.transform = gesture.transform;
-  }
-  gesture = null;
-  pending = null;
+  cancelGesture();
   pointers.clear();
   schedule();
 });
@@ -976,6 +983,7 @@ function download(blob, name) {
   setTimeout(() => URL.revokeObjectURL(url), 3000);
 }
 function saveProject() {
+  if (gesture?.id != null) finishPointer({ pointerId: gesture.id });
   download(
     new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" }),
     filename("draw.json"),
